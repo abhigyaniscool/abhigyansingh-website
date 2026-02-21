@@ -7,7 +7,7 @@ export default function HomePage() {
           <h1 className="page-title">About Me</h1>
           <div className="section">
             <p style={{ color: "var(--text-muted)", marginBottom: "1rem" }}>
-              Hi, I&apos;m Abhigyan Singh — a high school student with a curiosity for learning,
+              Hi, I&apos;m Abhigyan Singh — class of 2027 at Lynbrook High School with a curiosity for learning,
               building, and exploring ideas. This site is where I share a bit about myself,
               my research, blogs, programs, and interests.
             </p>
