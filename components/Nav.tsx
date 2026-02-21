@@ -1,34 +1,82 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const tabs = [
-  { href: "/", label: "About Me" },
-  { href: "/research", label: "Research" },
-  { href: "/blogs", label: "Blogs" },
-  { href: "/programs", label: "Programs" },
-  { href: "/interests", label: "Interests" },
+  { id: "about", label: "About Me" },
+  { id: "research", label: "Research" },
+  { id: "blogs", label: "Blogs" },
+  { id: "programs", label: "Programs" },
+  { id: "interests", label: "Interests" },
 ];
 
 export function Nav() {
-  const pathname = usePathname();
+  const [activeTab, setActiveTab] = useState("about");
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const sections = tabs.map((tab) => {
+        const element = document.getElementById(tab.id);
+        if (element) {
+          const rect = element.getBoundingClientRect();
+          return {
+            id: tab.id,
+            top: rect.top,
+            bottom: rect.bottom,
+          };
+        }
+        return null;
+      }).filter(Boolean);
+
+      const scrollPosition = window.scrollY + 150; // Offset for sticky nav
+
+      for (let i = sections.length - 1; i >= 0; i--) {
+        if (scrollPosition >= sections[i]!.top) {
+          setActiveTab(sections[i]!.id);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    handleScroll(); // Check on mount
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault();
+    const element = document.getElementById(id);
+    if (element) {
+      const navHeight = 60; // Approximate nav height
+      const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({
+        top: elementPosition - navHeight,
+        behavior: "smooth",
+      });
+    }
+  };
 
   return (
     <nav className="nav">
       <div className="nav-inner">
-        <Link href="/" className="logo">
+        <a
+          href="#about"
+          onClick={(e) => handleClick(e, "about")}
+          className="logo"
+        >
           Abhigyan Singh
-        </Link>
+        </a>
         <div className="tabs">
-          {tabs.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className={`tab ${pathname === href ? "active" : ""}`}
+          {tabs.map(({ id, label }) => (
+            <a
+              key={id}
+              href={`#${id}`}
+              onClick={(e) => handleClick(e, id)}
+              className={`tab ${activeTab === id ? "active" : ""}`}
             >
               {label}
-            </Link>
+            </a>
           ))}
         </div>
       </div>

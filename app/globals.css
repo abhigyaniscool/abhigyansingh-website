@@ -103,7 +103,17 @@ h1, h2, h3 {
 
 /* Page content */
 .main {
-  padding: 2.5rem 0 4rem;
+  padding: 0;
+}
+
+.page-section {
+  padding: 3rem 0 4rem;
+  min-height: 60vh;
+  scroll-margin-top: 80px; /* Offset for sticky nav */
+}
+
+.page-section:first-child {
+  padding-top: 2.5rem;
 }
 
 .page-title {
