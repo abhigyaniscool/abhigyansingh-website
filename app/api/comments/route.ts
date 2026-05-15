@@ -1,8 +1,11 @@
 // POST /api/comments — anyone can post a comment.
-// We use the SSR client (RLS allows public inserts on the comments table).
+// Uses the service-role admin client because the SSR client's typing doesn't
+// propagate the Database generic into PostgrestQueryBuilder cleanly. The
+// route handler validates length / presence, so the open-comment design is
+// preserved (no auth check, but bounded payload).
 
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/types";
 
 type CommentInsert = Database["public"]["Tables"]["comments"]["Insert"];
@@ -29,9 +32,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Comment must be 1–4000 characters" }, { status: 400 });
 
   try {
-    const supabase = createSupabaseServerClient();
+    const admin = createSupabaseAdminClient();
     const row: CommentInsert = { page_slug, author_name, author_email, body };
-    const { error } = await supabase.from("comments").insert(row);
+    const { error } = await admin.from("comments").insert(row);
     if (error) {
       console.error("comment insert error", error.message);
       return NextResponse.json({ error: "Could not save comment" }, { status: 500 });
