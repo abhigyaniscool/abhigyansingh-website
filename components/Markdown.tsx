@@ -1,22 +1,37 @@
 // Markdown renderer with GitHub-flavored extensions and KaTeX math support.
 // Use $...$ for inline math and $$...$$ blocks for display math.
 
-import ReactMarkdown from "react-markdown";
-import type { AnchorHTMLAttributes } from "react";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 
-function ExternalSafeAnchor(props: AnchorHTMLAttributes<HTMLAnchorElement>) {
-  const isExternal = !!props.href && /^https?:\/\//i.test(props.href);
+// react-markdown v9 passes a `node` extra prop alongside the standard anchor
+// attributes. We accept it loosely and strip it before forwarding.
+type AnchorRendererProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+  node?: unknown;
+  children?: ReactNode;
+};
+
+function MarkdownAnchor({ node, href, children, ...rest }: AnchorRendererProps) {
+  void node;
+  const isExternal = !!href && /^https?:\/\//i.test(href);
   return (
     <a
-      {...props}
-      target={isExternal ? "_blank" : props.target}
-      rel={isExternal ? "noopener noreferrer" : props.rel}
-    />
+      href={href}
+      {...rest}
+      target={isExternal ? "_blank" : rest.target}
+      rel={isExternal ? "noopener noreferrer" : rest.rel}
+    >
+      {children}
+    </a>
   );
 }
+
+const components: Components = {
+  a: MarkdownAnchor,
+};
 
 export default function Markdown({ children }: { children: string }) {
   return (
@@ -24,7 +39,7 @@ export default function Markdown({ children }: { children: string }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
-        components={{ a: ExternalSafeAnchor }}
+        components={components}
       >
         {children}
       </ReactMarkdown>

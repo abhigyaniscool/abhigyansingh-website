@@ -7,6 +7,12 @@ export const metadata: Metadata = {
   description: "Personal website — About, Research, Blogs, Programs, Interests",
 };
 
+// The Nav and most pages read the Supabase auth cookie. Force dynamic
+// rendering so Next.js doesn't try to statically prerender pages that
+// require request-time cookies.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default function RootLayout({
   children,
 }: Readonly<{

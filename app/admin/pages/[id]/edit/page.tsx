@@ -5,6 +5,15 @@ import PageEditor from "@/components/admin/PageEditor";
 
 export const metadata = { title: "Edit page — Admin" };
 
+type PageRow = {
+  id: string;
+  slug: string;
+  title: string;
+  body: string;
+  is_published: boolean;
+  sort_order: number;
+};
+
 export default async function EditPage({ params }: { params: { id: string } }) {
   const state = await getAuthState();
   if (!state.isAdmin) redirect("/login");
@@ -18,6 +27,9 @@ export default async function EditPage({ params }: { params: { id: string } }) {
 
   if (error || !data) notFound();
 
+  // The supabase-js client returns an untyped record by default; cast to our row type.
+  const page = data as unknown as PageRow;
+
   return (
     <section className="page-section">
       <div className="container">
@@ -25,12 +37,12 @@ export default async function EditPage({ params }: { params: { id: string } }) {
         <PageEditor
           mode="edit"
           initial={{
-            id: data.id as string,
-            slug: data.slug as string,
-            title: data.title as string,
-            body: data.body as string,
-            is_published: data.is_published as boolean,
-            sort_order: data.sort_order as number,
+            id: page.id,
+            slug: page.slug,
+            title: page.title,
+            body: page.body,
+            is_published: page.is_published,
+            sort_order: page.sort_order,
           }}
         />
       </div>

@@ -63,12 +63,13 @@ export async function DELETE(
   const admin = createSupabaseAdminClient();
 
   // First fetch the slug so we can clean up its comments.
-  const { data: page } = await admin
+  const { data: pageRow } = await admin
     .from("pages")
     .select("slug")
     .eq("id", params.id)
     .maybeSingle();
 
+  const page = pageRow as { slug?: string } | null;
   if (page?.slug) {
     await admin.from("comments").delete().eq("page_slug", page.slug);
   }
