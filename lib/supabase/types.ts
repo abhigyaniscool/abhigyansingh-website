@@ -67,6 +67,24 @@ export type Database = {
         };
         Relationships: [];
       };
+      page_views: {
+        Row: {
+          slug: string;
+          total_views: number;
+          last_viewed_at: string;
+        };
+        Insert: {
+          slug: string;
+          total_views?: number;
+          last_viewed_at?: string;
+        };
+        Update: {
+          slug?: string;
+          total_views?: number;
+          last_viewed_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };

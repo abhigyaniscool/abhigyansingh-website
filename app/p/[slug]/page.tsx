@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Markdown from "@/components/Markdown";
 import Comments from "@/components/Comments";
-import { getPageBySlug, listChildPages } from "@/lib/pages";
+import TrackPageView from "@/components/TrackPageView";
+import { getPageBySlug, listChildPages, isSystemSlug } from "@/lib/pages";
 
 type Props = { params: { slug: string } };
 
@@ -20,6 +21,10 @@ export default async function DynamicPage({ params }: Props) {
   const page = await getPageBySlug(params.slug);
   if (!page) notFound();
 
+  // Don't expose system pages (like _home) at /p/<slug>; they're rendered
+  // in their dedicated location and shouldn't be reachable via the dynamic route.
+  if (isSystemSlug(page.slug)) notFound();
+
   const isRoot = !page.parent_slug;
   const children = isRoot ? await listChildPages(page.slug) : [];
 
@@ -32,6 +37,7 @@ export default async function DynamicPage({ params }: Props) {
 
   return (
     <section className="page-section">
+      <TrackPageView slug={page.slug} />
       <div className="container">
         {parentTitle && page.parent_slug && (
           <nav className="breadcrumb">

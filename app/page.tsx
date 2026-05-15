@@ -1,12 +1,18 @@
 import Link from "next/link";
-import LoginForm from "@/components/LoginForm";
 import Comments from "@/components/Comments";
-import { listRootPages, listChildPages, type Page } from "@/lib/pages";
-import { getAuthState } from "@/lib/auth";
+import Markdown from "@/components/Markdown";
+import Stats from "@/components/Stats";
+import TrackPageView from "@/components/TrackPageView";
+import { getHomePage, listRootPages, listChildPages, type Page, HOME_SLUG } from "@/lib/pages";
 import { getSupabaseUrlOrNull } from "@/lib/supabase/env";
+import { getAuthState } from "@/lib/auth";
 
 export default async function HomePage() {
-  const [roots, auth] = await Promise.all([listRootPages(), getAuthState()]);
+  const [home, roots, auth] = await Promise.all([
+    getHomePage(),
+    listRootPages(),
+    getAuthState(),
+  ]);
   const configured = !!getSupabaseUrlOrNull();
 
   // Fetch all children of root pages in parallel.
@@ -20,22 +26,31 @@ export default async function HomePage() {
 
   return (
     <>
+      <TrackPageView slug={HOME_SLUG} />
+
       <section className="page-section hero">
         <div className="container">
           <div className="hero-prompt">
             <span className="hero-cmd">$ whoami</span>
+            {auth.isAdmin && (
+              <Link href={`/admin`} className="hero-edit-link">edit home →</Link>
+            )}
           </div>
-          <h1 className="hero-name">Abhigyan Singh</h1>
-          <p className="hero-tagline">
-            high-school mathematician · in love with proofs, paradoxes, and
-            anything that can be written with a <code>\sum</code>
-          </p>
-          <pre className="hero-block">
-{`> reading       ${"  "}functions · calculus · discrete math
-> currently     ${"  "}working through olympiad problem sets
-> tools         ${"  "}LaTeX · python · pen and a blank notebook
-> latest theorem${"  "}∑ 1/n² = π²/6   (Basel, Euler 1734)`}
-          </pre>
+
+          {home ? (
+            <div className="hero-body">
+              <Markdown>{home.body}</Markdown>
+            </div>
+          ) : (
+            <div className="card">
+              <p style={{ color: "var(--text-muted)" }}>
+                The home page hasn&apos;t been set up yet.{" "}
+                {configured
+                  ? "Log in as the admin and edit the page with slug “_home” at /admin."
+                  : "Set up Supabase (see README.md) and re-run the schema."}
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -46,10 +61,10 @@ export default async function HomePage() {
           {roots.length === 0 ? (
             <div className="card">
               <p style={{ color: "var(--text-muted)" }}>
-                No pages have been published yet.{" "}
-                {configured
-                  ? "Log in as the admin to create the first one."
-                  : "Set up Supabase (see README.md) and the seeded sections will appear here."}
+                No sections have been published yet.{" "}
+                {auth.isAdmin
+                  ? "Use “+ New page” in /admin to create the first one."
+                  : "Check back soon."}
               </p>
             </div>
           ) : (
@@ -84,26 +99,15 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {!auth.user && (
-        <section className="page-section" id="login">
-          <div className="container narrow">
-            <h2 className="home-section-title" style={{ marginTop: 0 }}>
-              $ sudo login
-            </h2>
-            <p style={{ color: "var(--text-muted)", marginBottom: "1rem" }}>
-              Only the configured admin can edit content. Visitors don&apos;t need
-              an account to read or comment.
-            </p>
-            <div className="card">
-              <LoginForm redirectTo="/admin" />
-            </div>
-          </div>
-        </section>
-      )}
+      <section className="page-section">
+        <div className="container">
+          <Stats />
+        </div>
+      </section>
 
       <section className="page-section">
         <div className="container">
-          <Comments pageSlug="home" />
+          <Comments pageSlug={HOME_SLUG} />
         </div>
       </section>
     </>

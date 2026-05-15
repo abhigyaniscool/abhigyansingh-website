@@ -1,6 +1,9 @@
 -- =============================================================================
--- Schema for Abhigyan Singh's mathematician site (v2 — adds page hierarchy)
--- Run this once in the Supabase SQL Editor. Re-running is safe.
+-- Schema for Abhigyan Singh's mathematician site (v3)
+--   v1: pages + comments
+--   v2: + parent_slug for two-level page hierarchy
+--   v3: + page_views (impression counter) + admin-editable home page
+-- Re-running this file is safe (all DDL is idempotent).
 -- =============================================================================
 
 -- ---------- pages ----------
@@ -15,17 +18,13 @@ create table if not exists public.pages (
     created_at   timestamptz not null default now(),
     updated_at   timestamptz not null default now()
 );
-
--- v1 → v2 migration: add parent_slug if upgrading from the first schema.
 alter table public.pages add column if not exists parent_slug text;
 
 create index if not exists pages_parent_idx
     on public.pages (parent_slug);
-
 create index if not exists pages_published_sort_idx
     on public.pages (is_published, sort_order, title);
 
--- keep updated_at fresh
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $fn$
 begin
@@ -51,13 +50,19 @@ create table if not exists public.comments (
 create index if not exists comments_page_idx
     on public.comments (page_slug, created_at desc);
 
+-- ---------- page_views (impression counter) ----------
+create table if not exists public.page_views (
+    slug           text primary key,
+    total_views    bigint not null default 0,
+    last_viewed_at timestamptz not null default now()
+);
+
 -- =============================================================================
 -- Row Level Security
--- The Next.js app uses the SERVICE_ROLE key for admin mutations (and for the
--- open comment-insert endpoint), and the ANON key for public reads.
 -- =============================================================================
-alter table public.pages    enable row level security;
-alter table public.comments enable row level security;
+alter table public.pages       enable row level security;
+alter table public.comments    enable row level security;
+alter table public.page_views  enable row level security;
 
 drop policy if exists "pages read published" on public.pages;
 create policy "pages read published" on public.pages
@@ -74,19 +79,42 @@ create policy "comments insert public" on public.comments
         and char_length(body) between 1 and 4000
     );
 
+-- view counts are publicly readable; writes go through the service-role key.
+drop policy if exists "page_views read all" on public.page_views;
+create policy "page_views read all" on public.page_views
+    for select using (true);
+
 -- =============================================================================
--- Seed: the original five sections (root pages, no parent_slug).
--- Tagged dollar-quotes ($body$...$body$) so that "$$" inside the bodies (for
--- display math) doesn't terminate the string literal. Safe to re-run.
+-- Seed: special _home page (admin-editable home content) + the 5 sections.
+-- The leading underscore in the slug marks it as system-special; the app
+-- filters it out of the nav/sections so it never appears as a tab.
 -- =============================================================================
 insert into public.pages (slug, title, body, parent_slug, sort_order, is_published) values
+('_home', 'Home', $body$# Abhigyan Singh
+
+> high-school mathematician · in love with proofs, paradoxes, and anything that can be written with a `\sum`
+
+```
+> reading         functions · calculus · discrete math
+> currently       working through olympiad problem sets
+> tools           LaTeX · python · pen and a blank notebook
+> latest theorem  ∑ 1/n² = π²/6   (Basel, Euler 1734)
+```
+
+Welcome. This site is my working notebook: research notes, blog posts, programs I'm part of, and the questions I keep coming back to. Every page supports full **LaTeX**, so when I write a proof I can write it the way I'd write it on paper.
+
+$$
+e^{i\pi} + 1 = 0
+$$
+
+Pick a section below to dive in.
+$body$, null, 0, true),
 ('about', 'About', $body$Hi, I'm **Abhigyan Singh** — a high-school student with a deep passion for **functions, calculus, and discrete mathematics**.
 
 This site is my working notebook: research notes, short blog posts, programs I'm part of, and the questions I keep coming back to. Pages support full **LaTeX**, so when I write a proof I can write it the way I'd write it on paper.
 
 > *"The essence of mathematics lies in its freedom."* — Georg Cantor
 $body$, null, 10, true),
-
 ('research', 'Research', $body$Notes on what I'm currently thinking about, ongoing problems, and short write-ups.
 
 ### Current threads
@@ -103,19 +131,15 @@ $$
 
 Sub-pages (added from the admin) will appear below this body.
 $body$, null, 20, true),
-
 ('blogs', 'Blogs', $body$Short pieces on mathematical ideas, problem-solving techniques, and things I learned the hard way.
 $body$, null, 30, true),
-
 ('programs', 'Programs', $body$Programs, competitions, and educational initiatives I've taken part in.
 $body$, null, 40, true),
-
 ('interests', 'Interests', $body$Beyond core mathematics I'm interested in **artificial intelligence** and **computation** — the places where pure structure meets real systems.
 $body$, null, 50, true)
 on conflict (slug) do nothing;
 
--- Backfill: any existing root rows from the v1 schema get parent_slug = NULL
--- (already true by default, but make it explicit so re-running is consistent).
+-- Make sure the 5 original root rows have parent_slug = NULL
 update public.pages set parent_slug = null
-  where slug in ('about','research','blogs','programs','interests')
+  where slug in ('about','research','blogs','programs','interests','_home')
     and parent_slug is not null;

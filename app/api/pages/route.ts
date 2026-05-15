@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/types";
+import { isSystemSlug } from "@/lib/pages";
 
 type PageInsert = Database["public"]["Tables"]["pages"]["Insert"];
 
@@ -41,6 +42,11 @@ export async function POST(req: Request) {
   if (!SLUG_RE.test(slug))
     return NextResponse.json(
       { error: "Slug must be lowercase letters, numbers, or hyphens (e.g. my-new-page)" },
+      { status: 400 }
+    );
+  if (isSystemSlug(slug))
+    return NextResponse.json(
+      { error: "Slugs starting with “_” are reserved for system pages" },
       { status: 400 }
     );
   if (parent_slug && !SLUG_RE.test(parent_slug))

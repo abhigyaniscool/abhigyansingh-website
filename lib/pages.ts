@@ -16,6 +16,11 @@ export type Page = {
   updated_at: string;
 };
 
+// Slugs starting with "_" are system-special and never appear in the nav
+// or public sections list. The home page lives at slug "_home".
+export const HOME_SLUG = "_home";
+export const isSystemSlug = (slug: string) => slug.startsWith("_");
+
 export async function listPublishedPages(): Promise<Page[]> {
   try {
     const supabase = createSupabaseServerClient();
@@ -38,7 +43,7 @@ export async function listPublishedPages(): Promise<Page[]> {
 
 export async function listRootPages(): Promise<Page[]> {
   const all = await listPublishedPages();
-  return all.filter((p) => !p.parent_slug);
+  return all.filter((p) => !p.parent_slug && !isSystemSlug(p.slug));
 }
 
 export async function listChildPages(parentSlug: string): Promise<Page[]> {
@@ -64,4 +69,9 @@ export async function getPageBySlug(slug: string): Promise<Page | null> {
     console.error("getPageBySlug exception", e);
     return null;
   }
+}
+
+// Convenience wrapper for the special home page row.
+export function getHomePage(): Promise<Page | null> {
+  return getPageBySlug(HOME_SLUG);
 }

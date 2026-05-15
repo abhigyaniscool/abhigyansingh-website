@@ -20,6 +20,8 @@ type Props =
   | { mode: "create"; initial?: undefined; roots: RootOption[] }
   | { mode: "edit"; initial: Initial; roots: RootOption[] };
 
+const isSystemSlug = (s: string) => s.startsWith("_");
+
 function slugify(s: string) {
   return s
     .toLowerCase()
@@ -52,19 +54,25 @@ export default function PageEditor(props: Props) {
   // Don't list this page as a possible parent of itself.
   const availableRoots = props.roots.filter((r) => r.slug !== init?.slug);
 
+  // System pages (e.g. _home) lock down slug/parent/publish controls.
+  const isSystem = props.mode === "edit" && !!init && isSystemSlug(init.slug);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      const payload = {
-        title: title.trim(),
-        slug: slug.trim(),
-        body,
-        parent_slug: parentSlug,
-        is_published: isPublished,
-        sort_order: Number(sortOrder),
-      };
+      // For system pages we never send slug/parent/published — server rejects them anyway.
+      const payload: Record<string, unknown> = isSystem
+        ? { title: title.trim(), body, sort_order: Number(sortOrder) }
+        : {
+            title: title.trim(),
+            slug: slug.trim(),
+            body,
+            parent_slug: parentSlug,
+            is_published: isPublished,
+            sort_order: Number(sortOrder),
+          };
       const url = props.mode === "create" ? "/api/pages" : `/api/pages/${init!.id}`;
       const method = props.mode === "create" ? "POST" : "PATCH";
       const res = await fetch(url, {
@@ -87,6 +95,13 @@ export default function PageEditor(props: Props) {
 
   return (
     <form className="page-editor" onSubmit={onSubmit}>
+      {isSystem && (
+        <div className="page-editor-system-note">
+          <strong>System page.</strong> Title, body, and sort order are editable; slug,
+          parent, and published state are locked to keep the home page reachable.
+        </div>
+      )}
+
       <div className="page-editor-meta">
         <label className="auth-label">
           Title
@@ -98,7 +113,7 @@ export default function PageEditor(props: Props) {
             value={title}
             onChange={(e) => {
               setTitle(e.target.value);
-              if (!touchedSlug) setSlug(slugify(e.target.value));
+              if (!touchedSlug && !isSystem) setSlug(slugify(e.target.value));
             }}
           />
         </label>
@@ -110,8 +125,9 @@ export default function PageEditor(props: Props) {
             type="text"
             required
             maxLength={80}
-            pattern="[a-z0-9\-]+"
+            pattern="_?[a-z0-9\-]+"
             value={slug}
+            disabled={isSystem}
             onChange={(e) => {
               setTouchedSlug(true);
               setSlug(e.target.value);
@@ -119,24 +135,26 @@ export default function PageEditor(props: Props) {
           />
         </label>
 
-        <label className="auth-label">
-          Parent page
-          <select
-            className="auth-input"
-            value={parentSlug ?? ""}
-            onChange={(e) => setParentSlug(e.target.value || null)}
-          >
-            <option value="">— Root (top-level tab) —</option>
-            {availableRoots.map((r) => (
-              <option key={r.slug} value={r.slug}>{r.title}</option>
-            ))}
-          </select>
-          {isRootBeingEdited && (
-            <span className="comment-form-optional">
-              This page is currently a top-level tab. Moving it under a parent will hide it from the nav.
-            </span>
-          )}
-        </label>
+        {!isSystem && (
+          <label className="auth-label">
+            Parent page
+            <select
+              className="auth-input"
+              value={parentSlug ?? ""}
+              onChange={(e) => setParentSlug(e.target.value || null)}
+            >
+              <option value="">— Root (top-level tab) —</option>
+              {availableRoots.map((r) => (
+                <option key={r.slug} value={r.slug}>{r.title}</option>
+              ))}
+            </select>
+            {isRootBeingEdited && (
+              <span className="comment-form-optional">
+                Moving this page under a parent will hide it from the top nav.
+              </span>
+            )}
+          </label>
+        )}
 
         <label className="auth-label">
           Sort order <span className="comment-form-optional">(lower = earlier)</span>
@@ -148,14 +166,16 @@ export default function PageEditor(props: Props) {
           />
         </label>
 
-        <label className="auth-label page-editor-checkbox">
-          <input
-            type="checkbox"
-            checked={isPublished}
-            onChange={(e) => setIsPublished(e.target.checked)}
-          />
-          Published (visible to visitors)
-        </label>
+        {!isSystem && (
+          <label className="auth-label page-editor-checkbox">
+            <input
+              type="checkbox"
+              checked={isPublished}
+              onChange={(e) => setIsPublished(e.target.checked)}
+            />
+            Published (visible to visitors)
+          </label>
+        )}
       </div>
 
       <SplitMarkdownEditor value={body} onChange={setBody} />

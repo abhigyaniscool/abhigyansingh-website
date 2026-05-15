@@ -4,6 +4,7 @@ import { getAuthState } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import DeletePageButton from "@/components/admin/DeletePageButton";
 import TogglePublishButton from "@/components/admin/TogglePublishButton";
+import { isSystemSlug, HOME_SLUG } from "@/lib/pages";
 
 export const metadata = { title: "Admin — Abhigyan Singh" };
 
@@ -40,7 +41,12 @@ export default async function AdminHome() {
     .order("sort_order", { ascending: true })
     .order("title", { ascending: true });
 
-  const rows = (data ?? []) as unknown as Row[];
+  const allRows = (data ?? []) as unknown as Row[];
+
+  // Pull system pages (e.g. _home) out for a separate quick-edit row at the top.
+  const systemRows = allRows.filter((r) => isSystemSlug(r.slug));
+  const homeRow = systemRows.find((r) => r.slug === HOME_SLUG) ?? null;
+  const rows = allRows.filter((r) => !isSystemSlug(r.slug));
 
   // Group: roots first, with their children listed beneath each root.
   const roots = rows.filter((r) => !r.parent_slug);
@@ -78,6 +84,25 @@ export default async function AdminHome() {
           Set a <em>Parent page</em> in the editor to make a page a sub-page; root pages appear as top-tabs.
         </p>
 
+        {homeRow && (
+          <div className="admin-system-card">
+            <div className="admin-system-card-head">
+              <span className="admin-system-tag">SYSTEM</span>
+              <span className="admin-system-title">Home page</span>
+              <span className="admin-system-slug">slug: <code>{homeRow.slug}</code></span>
+            </div>
+            <p className="admin-system-desc">
+              The body of this page is rendered as the hero on the home screen ({" "}
+              <Link href="/" className="admin-link">view</Link>). Slug, hidden state, and
+              parent are locked; everything else (including the title and full
+              Markdown + LaTeX body) is editable.
+            </p>
+            <Link href={`/admin/pages/${homeRow.id}/edit`} className="admin-primary-btn">
+              edit home page →
+            </Link>
+          </div>
+        )}
+
         {error && <div className="auth-error">{error.message}</div>}
 
         <div className="admin-table-wrap">
@@ -94,7 +119,7 @@ export default async function AdminHome() {
             </thead>
             <tbody>
               {ordered.length === 0 && (
-                <tr><td colSpan={6} className="admin-empty">No pages yet.</td></tr>
+                <tr><td colSpan={6} className="admin-empty">No content pages yet.</td></tr>
               )}
               {ordered.map((r) => (
                 <tr key={r.id} className={r.depth > 0 ? "admin-row-child" : "admin-row-root"}>

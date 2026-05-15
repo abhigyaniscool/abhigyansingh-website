@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/types";
+import { isSystemSlug, HOME_SLUG } from "@/lib/pages";
 
 type PageUpdate = Database["public"]["Tables"]["pages"]["Update"];
 
@@ -58,6 +59,36 @@ export async function PATCH(
 
   const admin = createSupabaseAdminClient();
 
+  // Look up the existing row so we can guard system pages (e.g. _home).
+  const { data: existing } = await admin
+    .from("pages")
+    .select("slug")
+    .eq("id", params.id)
+    .maybeSingle();
+  const existingRow = existing as { slug?: string } | null;
+  const existingSlug = existingRow?.slug ?? null;
+
+  if (existingSlug && isSystemSlug(existingSlug)) {
+    if (update.slug && update.slug !== existingSlug) {
+      return NextResponse.json(
+        { error: "The slug of a system page cannot be changed" },
+        { status: 400 }
+      );
+    }
+    if (update.parent_slug) {
+      return NextResponse.json(
+        { error: "System pages cannot have a parent" },
+        { status: 400 }
+      );
+    }
+    if (update.is_published === false) {
+      return NextResponse.json(
+        { error: "System pages cannot be hidden" },
+        { status: 400 }
+      );
+    }
+  }
+
   // Validate parent if we're setting one.
   if (update.parent_slug) {
     const { data: parent } = await admin
@@ -103,6 +134,12 @@ export async function DELETE(
     .maybeSingle();
 
   const page = pageRow as { slug?: string } | null;
+  if (page?.slug && isSystemSlug(page.slug)) {
+    return NextResponse.json(
+      { error: `System pages (e.g. ${HOME_SLUG}) cannot be deleted` },
+      { status: 400 }
+    );
+  }
   if (page?.slug) {
     await admin.from("comments").delete().eq("page_slug", page.slug);
     // Promote any children to root rather than orphan-deleting them.
