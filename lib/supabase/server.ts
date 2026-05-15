@@ -4,11 +4,12 @@
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { getSupabaseAnonKey, getSupabaseUrl } from "./env";
+import type { Database } from "./types";
 
 export function createSupabaseServerClient() {
   const cookieStore = cookies();
 
-  return createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {
+  return createServerClient<Database>(getSupabaseUrl(), getSupabaseAnonKey(), {
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value;

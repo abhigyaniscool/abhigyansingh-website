@@ -3,6 +3,9 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import type { Database } from "@/lib/supabase/types";
+
+type PageUpdate = Database["public"]["Tables"]["pages"]["Update"];
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9\-]{0,78}[a-z0-9])?$/;
 
@@ -24,7 +27,7 @@ export async function PATCH(
   }
   const p = payload as Record<string, unknown>;
 
-  const update: Record<string, unknown> = {};
+  const update: PageUpdate = {};
   if (typeof p.title === "string") update.title = p.title.trim();
   if (typeof p.slug === "string") {
     const slug = p.slug.trim().toLowerCase();
