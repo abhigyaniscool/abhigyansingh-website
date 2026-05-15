@@ -3,6 +3,9 @@
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/supabase/types";
+
+type CommentInsert = Database["public"]["Tables"]["comments"]["Insert"];
 
 export async function POST(req: Request) {
   let payload: unknown;
@@ -27,12 +30,8 @@ export async function POST(req: Request) {
 
   try {
     const supabase = createSupabaseServerClient();
-    const { error } = await supabase.from("comments").insert({
-      page_slug,
-      author_name,
-      author_email,
-      body,
-    });
+    const row: CommentInsert = { page_slug, author_name, author_email, body };
+    const { error } = await supabase.from("comments").insert(row);
     if (error) {
       console.error("comment insert error", error.message);
       return NextResponse.json({ error: "Could not save comment" }, { status: 500 });

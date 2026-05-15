@@ -3,6 +3,9 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import type { Database } from "@/lib/supabase/types";
+
+type PageInsert = Database["public"]["Tables"]["pages"]["Insert"];
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9\-]{0,78}[a-z0-9])?$/;
 
@@ -38,9 +41,10 @@ export async function POST(req: Request) {
     );
 
   const admin = createSupabaseAdminClient();
+  const row: PageInsert = { title, slug, body, is_published, sort_order };
   const { data, error } = await admin
     .from("pages")
-    .insert({ title, slug, body, is_published, sort_order })
+    .insert(row)
     .select("id")
     .single();
 
