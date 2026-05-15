@@ -40,10 +40,40 @@ export async function PATCH(
   if (typeof p.sort_order === "number" && Number.isFinite(p.sort_order))
     update.sort_order = Math.trunc(p.sort_order);
 
+  // parent_slug: explicit null means "make root"; string means "set parent"; absent means "no change"
+  if ("parent_slug" in p) {
+    const raw = p.parent_slug;
+    if (raw === null || raw === "") {
+      update.parent_slug = null;
+    } else if (typeof raw === "string") {
+      const ps = raw.trim().toLowerCase();
+      if (!SLUG_RE.test(ps))
+        return NextResponse.json({ error: "Invalid parent slug" }, { status: 400 });
+      update.parent_slug = ps;
+    }
+  }
+
   if (Object.keys(update).length === 0)
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
   const admin = createSupabaseAdminClient();
+
+  // Validate parent if we're setting one.
+  if (update.parent_slug) {
+    const { data: parent } = await admin
+      .from("pages")
+      .select("slug, parent_slug, id")
+      .eq("slug", update.parent_slug)
+      .maybeSingle();
+    const parentRow = parent as { slug?: string; parent_slug?: string | null; id?: string } | null;
+    if (!parentRow?.slug)
+      return NextResponse.json({ error: "Parent page not found" }, { status: 400 });
+    if (parentRow.parent_slug)
+      return NextResponse.json({ error: "Pages can only nest one level deep" }, { status: 400 });
+    if (parentRow.id === params.id)
+      return NextResponse.json({ error: "A page cannot be its own parent" }, { status: 400 });
+  }
+
   const { error } = await admin.from("pages").update(update).eq("id", params.id);
   if (error) {
     if (error.code === "23505")
@@ -65,7 +95,7 @@ export async function DELETE(
 
   const admin = createSupabaseAdminClient();
 
-  // First fetch the slug so we can clean up its comments.
+  // Fetch slug so we can clean up the page's comments and any direct children.
   const { data: pageRow } = await admin
     .from("pages")
     .select("slug")
@@ -75,6 +105,8 @@ export async function DELETE(
   const page = pageRow as { slug?: string } | null;
   if (page?.slug) {
     await admin.from("comments").delete().eq("page_slug", page.slug);
+    // Promote any children to root rather than orphan-deleting them.
+    await admin.from("pages").update({ parent_slug: null }).eq("parent_slug", page.slug);
   }
 
   const { error } = await admin.from("pages").delete().eq("id", params.id);

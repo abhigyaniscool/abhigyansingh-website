@@ -1,14 +1,21 @@
 # Abhigyan Singh — Personal Website
 
-A mathematician's personal site built with **Next.js 14**, deployed on **Vercel**, and backed by **Supabase** (Postgres + Auth) for content, comments, and admin login.
+A high-school mathematician's personal site. Terminal/hacker aesthetic, Overleaf-style LaTeX editor in admin, hierarchical pages, and a comment section on every page.
+
+Built on **Next.js 14** (App Router), deployed on **Vercel**, backed by **Supabase** (Postgres + Auth) for content, comments, and admin login.
 
 ## Features
 
-- Five seeded sections — About, Research, Blogs, Programs, Interests — all stored in the database and editable through the admin UI.
-- Markdown content with **LaTeX/KaTeX** math support (`$x^2$` inline, `$$...$$` display).
-- A **comment section on every page** (including the home page). Anyone can post a comment with a name and optional email; the admin can delete comments from the page.
-- A built-in **admin dashboard** at `/admin` for creating, editing, hiding, reordering, and deleting pages — **no code changes required to add a new page**.
-- Single-admin model: whichever email matches the `ADMIN_EMAIL` env var is the admin. Other accounts can sign in but can't edit content.
+- **Two-level page hierarchy** — root pages appear as top-tabs in the nav and on the home page; child pages live under their parent, with a breadcrumb back up.
+- **Overleaf-style split editor** in admin — source on the left, live KaTeX preview on the right. Toolbar shortcuts for headings, bold/italic, inline math (`$x^2$`), display math (`$$ ... $$`), `aligned` blocks, fractions, lists, code blocks, and links.
+- **Markdown + full LaTeX** in every page body. Use `$x^2$` for inline math, `$$ ... $$` for display equations, and `\begin{aligned}...\end{aligned}` inside `$$...$$` for multi-line proofs.
+- **Open comments** on every page — anyone can post (name + optional email + body, validated server-side). The admin sees a Delete button on each comment.
+- **Admin dashboard at `/admin`** — create, edit, hide, reorder, delete pages. New pages become tabs (root) or sub-pages (with a parent selected), with no code changes.
+- **Single-admin model** — whichever email matches the `ADMIN_EMAIL` env var is the admin. Other accounts can sign up but can't edit.
+
+## Look & feel
+
+Dark terminal-inspired theme: near-black background with a faint ASCII grid, JetBrains Mono headings, neon green (`#00ff88`) and cyan (`#66d9ff`) accents, a blinking caret on the logo, and `$` command-prompt prefixes throughout. KaTeX is restyled for dark mode so equations sit naturally on the page.
 
 ---
 
@@ -21,7 +28,9 @@ A mathematician's personal site built with **Next.js 14**, deployed on **Vercel*
    - `Project URL`
    - `anon public` key
    - `service_role` key (keep this **secret** — never expose it to the browser)
-3. In **SQL Editor → New query**, paste the contents of [`supabase/schema.sql`](./supabase/schema.sql) and click **Run**. This creates the `pages` and `comments` tables, the row-level-security policies, and seeds the five initial pages.
+3. In **SQL Editor → New query**, paste the contents of [`supabase/schema.sql`](./supabase/schema.sql) and click **Run**. This creates the `pages` and `comments` tables, adds the `parent_slug` column for the hierarchy, sets up RLS, and seeds the five initial pages.
+
+> **Already running v1?** The new schema is **idempotent** — re-running it will only `ALTER TABLE ... ADD COLUMN IF NOT EXISTS parent_slug` and leave your existing rows untouched. No data loss.
 
 ### 2. Configure environment variables
 
@@ -71,14 +80,16 @@ Push to the connected Git repository — Vercel will build automatically. Make s
 
 1. Log in as the admin.
 2. Click **Admin** in the nav (or visit `/admin`).
-3. Click **+ New page**, fill in the title, slug, and Markdown body, and save.
+3. Click **+ New page**, fill in the title, slug, body, and (optionally) a **Parent page** to make this a sub-page.
 4. The new page appears in the navigation immediately and is reachable at `/p/<slug>`.
 
 You can hide a page (without deleting it) by toggling its **Published** pill, or reorder the nav by changing the **sort order** field (lower = earlier).
 
+When you delete a parent page, its child pages are **promoted to root** rather than deleted.
+
 ## Writing math
 
-The body of each page is Markdown with the standard GitHub-flavored extensions plus math:
+Pages support full GitHub-flavored Markdown plus KaTeX math:
 
 ```markdown
 The famous Basel sum is $\sum_{n=1}^{\infty} 1/n^2 = \pi^2/6$.
@@ -86,13 +97,20 @@ The famous Basel sum is $\sum_{n=1}^{\infty} 1/n^2 = \pi^2/6$.
 $$
 \int_0^\infty e^{-x^2}\, dx = \frac{\sqrt{\pi}}{2}
 $$
+
+$$
+\begin{aligned}
+  (x + y)^2 &= x^2 + 2xy + y^2 \\
+            &= (x - y)^2 + 4xy
+\end{aligned}
+$$
 ```
+
+The split editor's toolbar has one-click buttons for the most common patterns (inline math, display math, `aligned`, fractions, headings, code blocks, etc.). Selected text gets wrapped; if nothing is selected, a sensible placeholder is inserted at the cursor.
 
 ## Moderating comments
 
 Comments are open to anyone (name + optional email + body, validated server-side). When you're logged in as admin, each comment shows a **Delete** button you can use to remove spam.
-
-If you ever want to tighten this (e.g. require approval before a comment shows up publicly), it's a small change in `app/api/comments/route.ts` — add an `approved` column to the `comments` table and filter on it.
 
 ---
 
@@ -100,25 +118,29 @@ If you ever want to tighten this (e.g. require approval before a comment shows u
 
 ```
 app/
-  page.tsx                    Home page (About + featured pages + login + comments)
+  page.tsx                    Home: hero + sections list (with sub-page links) + login + comments
   login/page.tsx              Login page
   admin/                      Admin dashboard + page editor
   api/comments/               POST a comment, DELETE (admin)
-  api/pages/                  Create/update/delete pages (admin)
-  p/[slug]/page.tsx           Renders any DB-backed page
+  api/pages/                  Create/update/delete pages (admin); validates parent hierarchy
+  p/[slug]/page.tsx           Renders any DB-backed page; lists children if it's a parent
 
 components/
-  Nav.tsx                     Server-rendered nav (reads pages from DB)
+  Nav.tsx                     Server-rendered nav; only shows ROOT pages from DB
   AuthBar.tsx                 Login/Logout/Admin links
   Comments.tsx                Comment list + form, used on every page
   Markdown.tsx                Markdown + KaTeX renderer
-  admin/                      Page editor & admin row buttons
+  admin/
+    PageEditor.tsx            Editor form (title, slug, parent, sort, published)
+    SplitMarkdownEditor.tsx   Overleaf-style split-pane editor with live KaTeX preview
+    DeletePageButton.tsx
+    TogglePublishButton.tsx
 
 lib/
-  supabase/                   SSR + browser + service-role clients
+  supabase/                   SSR + browser + service-role clients + Database type
   auth.ts                     getAuthState() + requireAdmin()
-  pages.ts                    Public page reads
+  pages.ts                    listPublishedPages / listRootPages / listChildPages / getPageBySlug
 
 supabase/
-  schema.sql                  Tables, RLS, seed data — run once in Supabase SQL editor
+  schema.sql                  Tables, RLS, seed data — run once in Supabase SQL editor (idempotent)
 ```

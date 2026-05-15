@@ -9,6 +9,7 @@ export type Page = {
   slug: string;
   title: string;
   body: string;
+  parent_slug: string | null;
   is_published: boolean;
   sort_order: number;
   created_at: string;
@@ -28,11 +29,21 @@ export async function listPublishedPages(): Promise<Page[]> {
       console.error("listPublishedPages error", error.message);
       return [];
     }
-    return (data ?? []) as Page[];
+    return (data ?? []) as unknown as Page[];
   } catch (e) {
     console.error("listPublishedPages exception", e);
     return [];
   }
+}
+
+export async function listRootPages(): Promise<Page[]> {
+  const all = await listPublishedPages();
+  return all.filter((p) => !p.parent_slug);
+}
+
+export async function listChildPages(parentSlug: string): Promise<Page[]> {
+  const all = await listPublishedPages();
+  return all.filter((p) => p.parent_slug === parentSlug);
 }
 
 export async function getPageBySlug(slug: string): Promise<Page | null> {
@@ -48,7 +59,7 @@ export async function getPageBySlug(slug: string): Promise<Page | null> {
       console.error("getPageBySlug error", error.message);
       return null;
     }
-    return (data ?? null) as Page | null;
+    return (data ?? null) as unknown as Page | null;
   } catch (e) {
     console.error("getPageBySlug exception", e);
     return null;

@@ -10,6 +10,7 @@ export type Database = {
           slug: string;
           title: string;
           body: string;
+          parent_slug: string | null;
           is_published: boolean;
           sort_order: number;
           created_at: string;
@@ -20,6 +21,7 @@ export type Database = {
           slug: string;
           title: string;
           body?: string;
+          parent_slug?: string | null;
           is_published?: boolean;
           sort_order?: number;
           created_at?: string;
@@ -30,6 +32,7 @@ export type Database = {
           slug?: string;
           title?: string;
           body?: string;
+          parent_slug?: string | null;
           is_published?: boolean;
           sort_order?: number;
           created_at?: string;

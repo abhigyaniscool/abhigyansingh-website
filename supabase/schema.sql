@@ -1,6 +1,6 @@
 -- =============================================================================
--- Schema for Abhigyan Singh's mathematician site
--- Run this once in the Supabase SQL Editor (Project → SQL → New Query)
+-- Schema for Abhigyan Singh's mathematician site (v2 — adds page hierarchy)
+-- Run this once in the Supabase SQL Editor. Re-running is safe.
 -- =============================================================================
 
 -- ---------- pages ----------
@@ -9,11 +9,18 @@ create table if not exists public.pages (
     slug         text not null unique,
     title        text not null,
     body         text not null default '',
+    parent_slug  text,
     is_published boolean not null default true,
     sort_order   integer not null default 100,
     created_at   timestamptz not null default now(),
     updated_at   timestamptz not null default now()
 );
+
+-- v1 → v2 migration: add parent_slug if upgrading from the first schema.
+alter table public.pages add column if not exists parent_slug text;
+
+create index if not exists pages_parent_idx
+    on public.pages (parent_slug);
 
 create index if not exists pages_published_sort_idx
     on public.pages (is_published, sort_order, title);
@@ -46,18 +53,16 @@ create index if not exists comments_page_idx
 
 -- =============================================================================
 -- Row Level Security
--- The Next.js app uses the SERVICE_ROLE key for admin mutations,
--- and the ANON key for public reads + visitor comment posts.
+-- The Next.js app uses the SERVICE_ROLE key for admin mutations (and for the
+-- open comment-insert endpoint), and the ANON key for public reads.
 -- =============================================================================
 alter table public.pages    enable row level security;
 alter table public.comments enable row level security;
 
--- pages: anyone can read a published page; only service role can write
 drop policy if exists "pages read published" on public.pages;
 create policy "pages read published" on public.pages
     for select using (is_published = true);
 
--- comments: anyone can read; anyone can insert (name + body required); only service role can delete
 drop policy if exists "comments read all" on public.comments;
 create policy "comments read all" on public.comments
     for select using (true);
@@ -70,20 +75,17 @@ create policy "comments insert public" on public.comments
     );
 
 -- =============================================================================
--- Seed: the original five sections, so the site is populated on first load.
--- We use tagged dollar-quotes ($body$...$body$) so that "$$" inside the page
--- bodies (for display math) does not prematurely terminate the string literal.
--- Safe to re-run -- on conflict do nothing.
+-- Seed: the original five sections (root pages, no parent_slug).
+-- Tagged dollar-quotes ($body$...$body$) so that "$$" inside the bodies (for
+-- display math) doesn't terminate the string literal. Safe to re-run.
 -- =============================================================================
-insert into public.pages (slug, title, body, sort_order, is_published) values
-('about', 'About', $body$Hi, I'm **Abhigyan Singh** — a mathematician with a deep passion for **functions, calculus, and discrete mathematics**.
+insert into public.pages (slug, title, body, parent_slug, sort_order, is_published) values
+('about', 'About', $body$Hi, I'm **Abhigyan Singh** — a high-school student with a deep passion for **functions, calculus, and discrete mathematics**.
 
-This site is where I share my mathematical explorations, research notes, programs I work on, and the questions that keep me up at night.
+This site is my working notebook: research notes, short blog posts, programs I'm part of, and the questions I keep coming back to. Pages support full **LaTeX**, so when I write a proof I can write it the way I'd write it on paper.
 
-Mathematics, for me, is the practice of finding the cleanest possible explanation for why something must be true. The pages here are an attempt to write down what I find along the way — and a place where readers can push back, ask questions, or share their own thinking in the comments.
-
-> *"The essence of mathematics lies in its freedom."*  — Georg Cantor
-$body$, 10, true),
+> *"The essence of mathematics lies in its freedom."* — Georg Cantor
+$body$, null, 10, true),
 
 ('research', 'Research', $body$Notes on what I'm currently thinking about, ongoing problems, and short write-ups.
 
@@ -95,45 +97,25 @@ $body$, 10, true),
 
 ### A favorite identity
 
-The Basel problem famously evaluates the sum of reciprocal squares:
-
 $$
-\sum_{n=1}^{\infty} \frac{1}{n^2} \;=\; \frac{\pi^2}{6}.
+\sum_{n=1}^{\infty} \frac{1}{n^2} \;=\; \frac{\pi^2}{6}
 $$
 
-I plan to add a longer write-up of Euler's original argument here.
-
-*New write-ups will be added from the admin dashboard — no code changes required.*
-$body$, 20, true),
+Sub-pages (added from the admin) will appear below this body.
+$body$, null, 20, true),
 
 ('blogs', 'Blogs', $body$Short pieces on mathematical ideas, problem-solving techniques, and things I learned the hard way.
-
-Topics I expect to cover:
-
-- Why the $\binom{n}{k}$ identities are easier than they look.
-- A clean derivation of the derivative of $e^x$.
-- What "uniform convergence" actually buys you.
-- Common pitfalls when using induction.
-
-Posts will appear here as they're written.
-$body$, 30, true),
+$body$, null, 30, true),
 
 ('programs', 'Programs', $body$Programs, competitions, and educational initiatives I've taken part in.
+$body$, null, 40, true),
 
-This includes math contests, summer programs, research initiatives, and other settings where I've been lucky enough to learn alongside great people.
-
-Specific entries — with year, role, and a short reflection — will be added here over time.
-$body$, 40, true),
-
-('interests', 'Interests', $body$Beyond the core mathematics, I'm interested in how mathematical structure shows up in **artificial intelligence** and **computation**.
-
-A few areas that fascinate me:
-
-- **Linear algebra** as the language of neural networks.
-- **Optimization** — why gradient descent works at all, and when it doesn't.
-- **Probability** — the bridge between pure mathematics and learning from data.
-- **Logic and computability** — the theoretical limits of what machines can decide.
-
-I think the most interesting questions live where pure mathematics, computation, and applied modeling meet.
-$body$, 50, true)
+('interests', 'Interests', $body$Beyond core mathematics I'm interested in **artificial intelligence** and **computation** — the places where pure structure meets real systems.
+$body$, null, 50, true)
 on conflict (slug) do nothing;
+
+-- Backfill: any existing root rows from the v1 schema get parent_slug = NULL
+-- (already true by default, but make it explicit so re-running is consistent).
+update public.pages set parent_slug = null
+  where slug in ('about','research','blogs','programs','interests')
+    and parent_slug is not null;

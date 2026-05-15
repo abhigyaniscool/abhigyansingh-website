@@ -1,35 +1,49 @@
 import Link from "next/link";
 import LoginForm from "@/components/LoginForm";
 import Comments from "@/components/Comments";
-import { listPublishedPages } from "@/lib/pages";
+import { listRootPages, listChildPages, type Page } from "@/lib/pages";
 import { getAuthState } from "@/lib/auth";
 import { getSupabaseUrlOrNull } from "@/lib/supabase/env";
 
 export default async function HomePage() {
-  const [pages, auth] = await Promise.all([listPublishedPages(), getAuthState()]);
+  const [roots, auth] = await Promise.all([listRootPages(), getAuthState()]);
   const configured = !!getSupabaseUrlOrNull();
+
+  // Fetch all children of root pages in parallel.
+  const childrenByRoot = new Map<string, Page[]>();
+  await Promise.all(
+    roots.map(async (r) => {
+      const kids = await listChildPages(r.slug);
+      childrenByRoot.set(r.slug, kids);
+    })
+  );
 
   return (
     <>
+      <section className="page-section hero">
+        <div className="container">
+          <div className="hero-prompt">
+            <span className="hero-cmd">$ whoami</span>
+          </div>
+          <h1 className="hero-name">Abhigyan Singh</h1>
+          <p className="hero-tagline">
+            high-school mathematician · in love with proofs, paradoxes, and
+            anything that can be written with a <code>\sum</code>
+          </p>
+          <pre className="hero-block">
+{`> reading       ${"  "}functions · calculus · discrete math
+> currently     ${"  "}working through olympiad problem sets
+> tools         ${"  "}LaTeX · python · pen and a blank notebook
+> latest theorem${"  "}∑ 1/n² = π²/6   (Basel, Euler 1734)`}
+          </pre>
+        </div>
+      </section>
+
       <section className="page-section">
         <div className="container">
-          <h1 className="page-title">Abhigyan Singh</h1>
-          <p className="hero-tagline">
-            Mathematician — research notes on calculus, discrete mathematics,
-            and the structures that quietly run the world.
-          </p>
+          <h2 className="home-section-title">$ ls ./sections</h2>
 
-          <div className="card" style={{ marginTop: "1.5rem" }}>
-            <p style={{ color: "var(--text-muted)", fontSize: "1.05rem" }}>
-              Welcome. This is a working notebook of my mathematical life:
-              ongoing research, short blog posts, programs I&apos;ve been part of, and the
-              questions I keep coming back to. Pick a section from the navigation
-              above, or browse the featured pages below.
-            </p>
-          </div>
-
-          <h2 className="home-section-title">Sections</h2>
-          {pages.length === 0 ? (
+          {roots.length === 0 ? (
             <div className="card">
               <p style={{ color: "var(--text-muted)" }}>
                 No pages have been published yet.{" "}
@@ -40,17 +54,31 @@ export default async function HomePage() {
             </div>
           ) : (
             <ul className="home-page-list">
-              {pages.map((p) => (
-                <li key={p.id} className="card home-page-card">
-                  <h3>
-                    <Link href={`/p/${p.slug}`}>{p.title}</Link>
-                  </h3>
-                  <p>{firstParagraph(p.body)}</p>
-                  <Link href={`/p/${p.slug}`} className="home-page-more">
-                    Read &rarr;
-                  </Link>
-                </li>
-              ))}
+              {roots.map((p) => {
+                const kids = childrenByRoot.get(p.slug) ?? [];
+                return (
+                  <li key={p.id} className="card home-page-card">
+                    <h3>
+                      <span className="home-card-prefix">▸</span>
+                      <Link href={`/p/${p.slug}`}>{p.title}</Link>
+                    </h3>
+                    <p>{firstParagraph(p.body)}</p>
+                    {kids.length > 0 && (
+                      <ul className="home-child-list">
+                        {kids.map((k) => (
+                          <li key={k.id}>
+                            <span className="home-child-prefix">└─</span>
+                            <Link href={`/p/${k.slug}`}>{k.title}</Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <Link href={`/p/${p.slug}`} className="home-page-more">
+                      cd ./{p.slug} &rarr;
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -60,7 +88,7 @@ export default async function HomePage() {
         <section className="page-section" id="login">
           <div className="container narrow">
             <h2 className="home-section-title" style={{ marginTop: 0 }}>
-              Admin login
+              $ sudo login
             </h2>
             <p style={{ color: "var(--text-muted)", marginBottom: "1rem" }}>
               Only the configured admin can edit content. Visitors don&apos;t need

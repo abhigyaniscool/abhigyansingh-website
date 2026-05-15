@@ -32,6 +32,10 @@ export async function POST(req: Request) {
     typeof p.sort_order === "number" && Number.isFinite(p.sort_order)
       ? Math.trunc(p.sort_order)
       : 100;
+  const parent_slug =
+    typeof p.parent_slug === "string" && p.parent_slug.trim()
+      ? p.parent_slug.trim().toLowerCase()
+      : null;
 
   if (!title) return NextResponse.json({ error: "Title is required" }, { status: 400 });
   if (!SLUG_RE.test(slug))
@@ -39,9 +43,26 @@ export async function POST(req: Request) {
       { error: "Slug must be lowercase letters, numbers, or hyphens (e.g. my-new-page)" },
       { status: 400 }
     );
+  if (parent_slug && !SLUG_RE.test(parent_slug))
+    return NextResponse.json({ error: "Invalid parent slug" }, { status: 400 });
 
   const admin = createSupabaseAdminClient();
-  const row: PageInsert = { title, slug, body, is_published, sort_order };
+
+  // If a parent is specified, make sure it exists and is itself a root.
+  if (parent_slug) {
+    const { data: parent } = await admin
+      .from("pages")
+      .select("slug, parent_slug")
+      .eq("slug", parent_slug)
+      .maybeSingle();
+    const parentRow = parent as { slug?: string; parent_slug?: string | null } | null;
+    if (!parentRow?.slug)
+      return NextResponse.json({ error: "Parent page not found" }, { status: 400 });
+    if (parentRow.parent_slug)
+      return NextResponse.json({ error: "Pages can only nest one level deep" }, { status: 400 });
+  }
+
+  const row: PageInsert = { title, slug, body, parent_slug, is_published, sort_order };
   const { data, error } = await admin
     .from("pages")
     .insert(row)

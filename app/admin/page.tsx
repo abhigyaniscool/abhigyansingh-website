@@ -11,6 +11,7 @@ type Row = {
   id: string;
   slug: string;
   title: string;
+  parent_slug: string | null;
   is_published: boolean;
   sort_order: number;
   updated_at: string;
@@ -23,7 +24,7 @@ export default async function AdminHome() {
     return (
       <section className="page-section">
         <div className="container narrow">
-          <h1 className="page-title">Not authorised</h1>
+          <h1 className="page-title">$ permission denied</h1>
           <p style={{ color: "var(--text-muted)" }}>
             You&apos;re logged in, but only the configured admin email can edit content.
           </p>
@@ -35,24 +36,46 @@ export default async function AdminHome() {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
     .from("pages")
-    .select("id, slug, title, is_published, sort_order, updated_at")
+    .select("id, slug, title, parent_slug, is_published, sort_order, updated_at")
     .order("sort_order", { ascending: true })
     .order("title", { ascending: true });
 
-  const rows = (data ?? []) as Row[];
+  const rows = (data ?? []) as unknown as Row[];
+
+  // Group: roots first, with their children listed beneath each root.
+  const roots = rows.filter((r) => !r.parent_slug);
+  const childrenByParent = new Map<string, Row[]>();
+  for (const r of rows) {
+    if (!r.parent_slug) continue;
+    const arr = childrenByParent.get(r.parent_slug) ?? [];
+    arr.push(r);
+    childrenByParent.set(r.parent_slug, arr);
+  }
+  // Orphans: a child whose parent was deleted or unpublished
+  const knownRoots = new Set(roots.map((r) => r.slug));
+  const orphans = rows.filter((r) => r.parent_slug && !knownRoots.has(r.parent_slug));
+
+  type Display = Row & { depth: number };
+  const ordered: Display[] = [];
+  for (const root of roots) {
+    ordered.push({ ...root, depth: 0 });
+    const kids = childrenByParent.get(root.slug) ?? [];
+    for (const k of kids) ordered.push({ ...k, depth: 1 });
+  }
+  for (const o of orphans) ordered.push({ ...o, depth: 1 });
 
   return (
     <section className="page-section">
-      <div className="container">
+      <div className="container wide">
         <div className="admin-header">
-          <h1 className="page-title" style={{ marginBottom: 0 }}>Admin · Pages</h1>
+          <h1 className="page-title" style={{ marginBottom: 0 }}>$ admin · pages</h1>
           <Link href="/admin/pages/new" className="admin-primary-btn">+ New page</Link>
         </div>
 
-        <p style={{ color: "var(--text-muted)", marginBottom: "1.5rem" }}>
-          Pages can be added, edited, hidden, or deleted from here — no code changes required.
-          Each page supports Markdown and LaTeX (use <code>$x^2$</code> for inline math
-          and <code>$$ ... $$</code> for display equations).
+        <p className="admin-help">
+          Pages can be added, edited, hidden, reordered, or deleted from here — no code changes.
+          Each page supports Markdown + LaTeX (`$x^2$` inline, `$$ \int_0^1 x\,dx $$` for display).
+          Set a <em>Parent page</em> in the editor to make a page a sub-page; root pages appear as top-tabs.
         </p>
 
         {error && <div className="auth-error">{error.message}</div>}
@@ -70,20 +93,25 @@ export default async function AdminHome() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && (
-                <tr><td colSpan={6} style={{ padding: "1rem", color: "var(--text-muted)" }}>No pages yet.</td></tr>
+              {ordered.length === 0 && (
+                <tr><td colSpan={6} className="admin-empty">No pages yet.</td></tr>
               )}
-              {rows.map((r) => (
-                <tr key={r.id}>
+              {ordered.map((r) => (
+                <tr key={r.id} className={r.depth > 0 ? "admin-row-child" : "admin-row-root"}>
                   <td>
-                    <Link href={`/p/${r.slug}`} className="admin-link">{r.title}</Link>
+                    <span className="admin-tree-prefix">
+                      {r.depth === 0 ? "▸" : "└─"}
+                    </span>
+                    <Link href={`/p/${r.slug}`} className="admin-link">
+                      {r.title}
+                    </Link>
                   </td>
                   <td><code>/p/{r.slug}</code></td>
                   <td>{r.sort_order}</td>
                   <td>
                     <TogglePublishButton id={r.id} isPublished={r.is_published} />
                   </td>
-                  <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                  <td className="admin-cell-date">
                     {new Date(r.updated_at).toLocaleDateString()}
                   </td>
                   <td className="admin-actions">
