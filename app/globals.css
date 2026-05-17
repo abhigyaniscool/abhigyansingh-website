@@ -1393,3 +1393,66 @@ input.auth-input:disabled {
   cursor: not-allowed;
   border-color: var(--border-soft);
 }
+
+/* =============================================================================
+   Share links (LinkedIn / Discord / Copy)
+============================================================================= */
+.share-links {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 0;
+  margin-top: 1.5rem;
+  border-top: 1px dashed var(--border);
+}
+
+.share-prompt {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--accent);
+  margin-right: 0.3rem;
+  font-weight: 600;
+}
+
+.share-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+.share-link:hover {
+  background: var(--bg-elev);
+  color: var(--text);
+  text-decoration: none;
+  border-color: var(--border-bright);
+  transform: translateY(-1px);
+}
+.share-link svg { flex-shrink: 0; }
+
+/* Brand-tinted hovers (subtle) */
+.share-linkedin:hover {
+  color: #66c2ff;
+  border-color: rgba(102, 194, 255, 0.5);
+  box-shadow: 0 0 12px rgba(102, 194, 255, 0.18);
+}
+.share-discord:hover {
+  color: #b9a4ff;
+  border-color: rgba(185, 164, 255, 0.5);
+  box-shadow: 0 0 12px rgba(185, 164, 255, 0.18);
+}
+.share-copy:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}

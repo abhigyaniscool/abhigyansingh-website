@@ -2,6 +2,7 @@ import Link from "next/link";
 import Comments from "@/components/Comments";
 import Markdown from "@/components/Markdown";
 import Stats from "@/components/Stats";
+import ShareLinks from "@/components/ShareLinks";
 import TrackPageView from "@/components/TrackPageView";
 import { getHomePage, listRootPages, listChildPages, type Page, HOME_SLUG } from "@/lib/pages";
 import { getSupabaseUrlOrNull } from "@/lib/supabase/env";
@@ -102,6 +103,12 @@ export default async function HomePage() {
       <section className="page-section">
         <div className="container">
           <Stats />
+        </div>
+      </section>
+
+      <section className="page-section">
+        <div className="container">
+          <ShareLinks title="Abhigyan Singh — high-school mathematician" />
         </div>
       </section>
 

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Markdown from "@/components/Markdown";
 import Comments from "@/components/Comments";
+import ShareLinks from "@/components/ShareLinks";
 import TrackPageView from "@/components/TrackPageView";
 import { getPageBySlug, listChildPages, isSystemSlug } from "@/lib/pages";
 
@@ -73,6 +74,8 @@ export default async function DynamicPage({ params }: Props) {
             </ul>
           </section>
         )}
+
+        <ShareLinks title={page.title} />
 
         <Comments pageSlug={page.slug} />
       </div>

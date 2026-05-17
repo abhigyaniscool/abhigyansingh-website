@@ -30,9 +30,12 @@ Dark terminal-inspired theme: near-black background with a faint ASCII grid, Jet
    - `Project URL`
    - `anon public` key
    - `service_role` key (keep this **secret** — never expose it to the browser)
-3. In **SQL Editor → New query**, paste the contents of [`supabase/schema.sql`](./supabase/schema.sql) and click **Run**. This creates the `pages`, `comments`, and `page_views` tables, adds the `parent_slug` column for the page hierarchy, sets up RLS, and seeds the home (`_home`) and the five initial section pages.
+3. In **SQL Editor → New query**, paste the contents of [`supabase/schema.sql`](./supabase/schema.sql) and click **Run**. This creates the tables, indexes, triggers, and RLS policies. It contains **no data inserts** and is safe to re-run as many times as you want — it will never modify or restore any row.
+4. In a second SQL Editor query, paste [`supabase/seed.sql`](./supabase/seed.sql) and click **Run**. This inserts the default home page (`_home`) and the five starter sections (About, Research, Blogs, Programs, Interests). It uses a one-shot sentinel, so re-running `seed.sql` after the first time does nothing — your deleted/edited pages won't be restored.
 
-> **Already running an earlier version?** The schema is **idempotent** — re-running adds the new `page_views` table and seeds the `_home` row only if missing, and leaves all your existing data alone. No data loss.
+> **Already had an earlier version of the site running?** Run `schema.sql` once (it'll add any missing tables like `system_state` and `page_views` without touching your data), then run [`supabase/migrate-existing-to-v3.sql`](./supabase/migrate-existing-to-v3.sql) once. That migration stamps the "initial seed done" sentinel so `seed.sql` becomes a no-op forever — anything you've deleted from `/admin` stays deleted.
+
+> **Important: deploys do NOT touch your database.** Pushing to GitHub triggers Vercel to rebuild Next.js. Vercel never executes any SQL against Supabase; the only Supabase interactions are runtime queries from the running app. So a fresh deploy will never restore pages you've deleted in `/admin`.
 
 ### 2. Configure environment variables
 
@@ -167,5 +170,7 @@ lib/
   pages.ts                    listPublishedPages / listRootPages / listChildPages / getPageBySlug
 
 supabase/
-  schema.sql                  Tables, RLS, seed data — run once in Supabase SQL editor (idempotent)
+  schema.sql                       Tables, indexes, RLS policies — DDL only, idempotent, safe to re-run
+  seed.sql                         Default content (home page + sections) — protected by a one-shot sentinel
+  migrate-existing-to-v3.sql       Stamps the seed sentinel for sites that already have data; safe to re-run
 ```
